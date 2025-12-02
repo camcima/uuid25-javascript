@@ -128,6 +128,7 @@ export class Uuid25 {
      *
      * - 25-digit Base36 Uuid25 format: `3ud3gtvgolimgu9lah6aie99o`
      * - 26-character Crockford Base32 format: `3UD3GTVGOLIMGU9LAH6AIE99O`
+     * - 26-character RFC 4648 Base32 format: `DTDI3VVOPCJNHU4MBT42EJH5E`
      * - 32-digit hexadecimal format without hyphens: `40eb9860cf3e45e2a90eb82236ac806c`
      * - 8-4-4-4-12 hyphenated format: `40eb9860-cf3e-45e2-a90e-b82236ac806c`
      * - Hyphenated format with surrounding braces: `{40eb9860-cf3e-45e2-a90e-b82236ac806c}`
@@ -140,8 +141,30 @@ export class Uuid25 {
         switch (uuidString.length) {
             case 25:
                 return Uuid25.parseUuid25(uuidString);
-            case 26:
-                return Uuid25.parseCrockford(uuidString);
+            case 26: {
+                // Both Crockford and RFC 4648 Base32 are 26 chars, distinguish by content
+                // Crockford encoding produces: 0-9, A-H, J-K, M-N, P-T, V-Z (never I, L, O, U)
+                // RFC 4648 encoding produces: A-Z, 2-7 (never 0, 1, 8, 9)
+                const hasCrockfordOnly = /[0189]/.test(uuidString); // Only Crockford produces these
+                const hasBase32Only = /[ILOUilou]/.test(uuidString); // Only RFC 4648 produces these
+                if (hasCrockfordOnly && hasBase32Only) {
+                    // Contains both format-specific chars - invalid
+                    throw newParseError();
+                }
+                else if (hasCrockfordOnly) {
+                    // Definitely Crockford (contains 0, 1, 8, or 9)
+                    return Uuid25.parseCrockford(uuidString);
+                }
+                else if (hasBase32Only) {
+                    // Definitely RFC 4648 Base32 (contains I, L, O, or U)
+                    return Uuid25.parseBase32(uuidString);
+                }
+                else {
+                    // Ambiguous: could be valid in both formats
+                    // Contains only: A-H, J-K, M-N, P-T, V-Z, 2-7
+                    throw new SyntaxError("ambiguous Base32 format; use parseCrockford() or parseBase32() explicitly");
+                }
+            }
             case 32:
                 return Uuid25.parseHex(uuidString);
             case 36:
@@ -252,6 +275,22 @@ export class Uuid25 {
         return Uuid25.fromDigitValues(convertBase(src, 32, 36, 25));
     }
     /**
+     * Creates an instance from the 26-character RFC 4648 Base32 format.
+     *
+     * RFC 4648 Base32 uses the alphabet: A-Z, 2-7.
+     * This method is case-insensitive.
+     *
+     * @throws `SyntaxError` if the argument is not in the specified format.
+     * @category Conversion-from
+     */
+    static parseBase32(uuidString) {
+        if (!/^[A-Za-z2-7]{26}$/.test(uuidString)) {
+            throw newParseError();
+        }
+        const src = decodeBase32Chars(uuidString);
+        return Uuid25.fromDigitValues(convertBase(src, 32, 36, 25));
+    }
+    /**
      * Formats `this` in the 32-digit hexadecimal format without hyphens:
      * `40eb9860cf3e45e2a90eb82236ac806c`.
      *
@@ -309,6 +348,23 @@ export class Uuid25 {
         const src = decodeDigitChars(this.value, 36);
         const digitValues = convertBase(src, 36, 32, 26);
         const digits = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+        let buffer = "";
+        for (const e of digitValues) {
+            buffer += digits.charAt(e);
+        }
+        return buffer;
+    }
+    /**
+     * Formats `this` in the RFC 4648 Base32 format (26 characters).
+     *
+     * RFC 4648 Base32 uses the alphabet: A-Z, 2-7
+     *
+     * @category Conversion-to
+     */
+    toBase32() {
+        const src = decodeDigitChars(this.value, 36);
+        const digitValues = convertBase(src, 36, 32, 26);
+        const digits = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
         let buffer = "";
         for (const e of digitValues) {
             buffer += digits.charAt(e);
@@ -440,6 +496,29 @@ const decodeCrockfordChars = (digitChars) => {
         const code = digitChars.charCodeAt(i);
         digitValues[i] = code < 128 ? CROCKFORD_DECODE_MAP[code] : 0x7f;
         assert(digitValues[i] < 32, "invalid Crockford Base32 character");
+    }
+    return digitValues;
+};
+/** Converts from a string of RFC 4648 Base32 characters to an array of digit values. */
+const decodeBase32Chars = (digitChars) => {
+    // RFC 4648 Base32 alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZ234567
+    // Mapping table for ASCII code points to Base32 digit values
+    const BASE32_DECODE_MAP = new Uint8Array(128).fill(0x7f);
+    // A-Z map to values 0-25 (uppercase and lowercase)
+    for (let i = 0; i < 26; i++) {
+        BASE32_DECODE_MAP[65 + i] = i; // 'A'-'Z'
+        BASE32_DECODE_MAP[97 + i] = i; // 'a'-'z'
+    }
+    // 2-7 map to values 26-31
+    for (let i = 0; i < 6; i++) {
+        BASE32_DECODE_MAP[50 + i] = 26 + i; // '2'-'7'
+    }
+    const len = digitChars.length;
+    const digitValues = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+        const code = digitChars.charCodeAt(i);
+        digitValues[i] = code < 128 ? BASE32_DECODE_MAP[code] : 0x7f;
+        assert(digitValues[i] < 32, "invalid RFC 4648 Base32 character");
     }
     return digitValues;
 };

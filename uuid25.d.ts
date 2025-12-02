@@ -98,6 +98,7 @@ export declare class Uuid25 {
      *
      * - 25-digit Base36 Uuid25 format: `3ud3gtvgolimgu9lah6aie99o`
      * - 26-character Crockford Base32 format: `3UD3GTVGOLIMGU9LAH6AIE99O`
+     * - 26-character RFC 4648 Base32 format: `DTDI3VVOPCJNHU4MBT42EJH5E`
      * - 32-digit hexadecimal format without hyphens: `40eb9860cf3e45e2a90eb82236ac806c`
      * - 8-4-4-4-12 hyphenated format: `40eb9860-cf3e-45e2-a90e-b82236ac806c`
      * - Hyphenated format with surrounding braces: `{40eb9860-cf3e-45e2-a90e-b82236ac806c}`
@@ -168,6 +169,16 @@ export declare class Uuid25 {
      */
     static parseCrockford(uuidString: string): Uuid25;
     /**
+     * Creates an instance from the 26-character RFC 4648 Base32 format.
+     *
+     * RFC 4648 Base32 uses the alphabet: A-Z, 2-7.
+     * This method is case-insensitive.
+     *
+     * @throws `SyntaxError` if the argument is not in the specified format.
+     * @category Conversion-from
+     */
+    static parseBase32(uuidString: string): Uuid25;
+    /**
      * Formats `this` in the 32-digit hexadecimal format without hyphens:
      * `40eb9860cf3e45e2a90eb82236ac806c`.
      *
@@ -204,4 +215,12 @@ export declare class Uuid25 {
      * @category Conversion-to
      */
     toCrockford(): string;
+    /**
+     * Formats `this` in the RFC 4648 Base32 format (26 characters).
+     *
+     * RFC 4648 Base32 uses the alphabet: A-Z, 2-7
+     *
+     * @category Conversion-to
+     */
+    toBase32(): string;
 }

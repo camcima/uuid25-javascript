@@ -28,6 +28,7 @@ const c = [
   Uuid25.parse("{e7a1d63b-7117-4423-8988-afcf12161878}"),
   Uuid25.parse("urn:uuid:e7a1d63b-7117-4423-8988-afcf12161878"),
   Uuid25.parse("77M7B3PW8Q8GHRK25FSW91C63R"),
+  Uuid25.parse("HHUHLDW4IXIQRYTCFPZ4JBMGDY"),
 ];
 console.assert(c.every((x) => x.value === "dpoadk8izg9y4tte7vy1xt94o"));
 
@@ -37,6 +38,7 @@ console.assert(d.toHyphenated() === "e7a1d63b-7117-4423-8988-afcf12161878");
 console.assert(d.toBraced() === "{e7a1d63b-7117-4423-8988-afcf12161878}");
 console.assert(d.toUrn() === "urn:uuid:e7a1d63b-7117-4423-8988-afcf12161878");
 console.assert(d.toCrockford() === "77M7B3PW8Q8GHRK25FSW91C63R");
+console.assert(d.toBase32() === "HHUHLDW4IXIQRYTCFPZ4JBMGDY");
 ```
 
 ## CommonJS support
