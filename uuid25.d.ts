@@ -97,6 +97,7 @@ export declare class Uuid25 {
      * This method accepts the following formats:
      *
      * - 25-digit Base36 Uuid25 format: `3ud3gtvgolimgu9lah6aie99o`
+     * - 26-character Crockford Base32 format: `3UD3GTVGOLIMGU9LAH6AIE99O`
      * - 32-digit hexadecimal format without hyphens: `40eb9860cf3e45e2a90eb82236ac806c`
      * - 8-4-4-4-12 hyphenated format: `40eb9860-cf3e-45e2-a90e-b82236ac806c`
      * - Hyphenated format with surrounding braces: `{40eb9860-cf3e-45e2-a90e-b82236ac806c}`
@@ -155,6 +156,18 @@ export declare class Uuid25 {
      */
     static parseUrn(uuidString: string): Uuid25;
     /**
+     * Creates an instance from the 26-character Crockford Base32 format.
+     *
+     * Crockford Base32 uses the alphabet: 0-9, A-H, J-K, M-N, P-T, V-Z
+     * (excluding I, L, O, U). This method is case-insensitive and tolerates
+     * the excluded characters by mapping them to similar-looking valid characters
+     * (I/i/L/l -> 1, O/o -> 0) per the Crockford specification.
+     *
+     * @throws `SyntaxError` if the argument is not in the specified format.
+     * @category Conversion-from
+     */
+    static parseCrockford(uuidString: string): Uuid25;
+    /**
      * Formats `this` in the 32-digit hexadecimal format without hyphens:
      * `40eb9860cf3e45e2a90eb82236ac806c`.
      *
@@ -182,4 +195,13 @@ export declare class Uuid25 {
      * @category Conversion-to
      */
     toUrn(): string;
+    /**
+     * Formats `this` in the Crockford Base32 format (26 characters).
+     *
+     * Crockford Base32 uses the alphabet: 0-9, A-H, J-K, M-N, P-T, V-Z
+     * (excluding I, L, O, U to avoid confusion with similar-looking characters).
+     *
+     * @category Conversion-to
+     */
+    toCrockford(): string;
 }

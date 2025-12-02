@@ -127,6 +127,7 @@ export class Uuid25 {
      * This method accepts the following formats:
      *
      * - 25-digit Base36 Uuid25 format: `3ud3gtvgolimgu9lah6aie99o`
+     * - 26-character Crockford Base32 format: `3UD3GTVGOLIMGU9LAH6AIE99O`
      * - 32-digit hexadecimal format without hyphens: `40eb9860cf3e45e2a90eb82236ac806c`
      * - 8-4-4-4-12 hyphenated format: `40eb9860-cf3e-45e2-a90e-b82236ac806c`
      * - Hyphenated format with surrounding braces: `{40eb9860-cf3e-45e2-a90e-b82236ac806c}`
@@ -139,6 +140,8 @@ export class Uuid25 {
         switch (uuidString.length) {
             case 25:
                 return Uuid25.parseUuid25(uuidString);
+            case 26:
+                return Uuid25.parseCrockford(uuidString);
             case 32:
                 return Uuid25.parseHex(uuidString);
             case 36:
@@ -231,6 +234,24 @@ export class Uuid25 {
             .join(""));
     }
     /**
+     * Creates an instance from the 26-character Crockford Base32 format.
+     *
+     * Crockford Base32 uses the alphabet: 0-9, A-H, J-K, M-N, P-T, V-Z
+     * (excluding I, L, O, U). This method is case-insensitive and tolerates
+     * the excluded characters by mapping them to similar-looking valid characters
+     * (I/i/L/l -> 1, O/o -> 0) per the Crockford specification.
+     *
+     * @throws `SyntaxError` if the argument is not in the specified format.
+     * @category Conversion-from
+     */
+    static parseCrockford(uuidString) {
+        if (!/^[0-9A-Za-z]{26}$/.test(uuidString)) {
+            throw newParseError();
+        }
+        const src = decodeCrockfordChars(uuidString);
+        return Uuid25.fromDigitValues(convertBase(src, 32, 36, 25));
+    }
+    /**
      * Formats `this` in the 32-digit hexadecimal format without hyphens:
      * `40eb9860cf3e45e2a90eb82236ac806c`.
      *
@@ -275,6 +296,24 @@ export class Uuid25 {
      */
     toUrn() {
         return "urn:uuid:" + this.toHyphenated();
+    }
+    /**
+     * Formats `this` in the Crockford Base32 format (26 characters).
+     *
+     * Crockford Base32 uses the alphabet: 0-9, A-H, J-K, M-N, P-T, V-Z
+     * (excluding I, L, O, U to avoid confusion with similar-looking characters).
+     *
+     * @category Conversion-to
+     */
+    toCrockford() {
+        const src = decodeDigitChars(this.value, 36);
+        const digitValues = convertBase(src, 36, 32, 26);
+        const digits = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+        let buffer = "";
+        for (const e of digitValues) {
+            buffer += digits.charAt(e);
+        }
+        return buffer;
     }
 }
 /**
@@ -350,6 +389,57 @@ const decodeDigitChars = (digitChars, base) => {
     for (let i = 0; i < len; i++) {
         digitValues[i] = DECODE_MAP[digitChars.charCodeAt(i)] ?? 0x7f;
         assert(digitValues[i] < base, "invalid digit character");
+    }
+    return digitValues;
+};
+/** Converts from a string of Crockford Base32 characters to an array of digit values. */
+const decodeCrockfordChars = (digitChars) => {
+    // Crockford Base32 alphabet: 0123456789ABCDEFGHJKMNPQRSTVWXYZ
+    // Mapping table for ASCII code points to Crockford Base32 digit values
+    // Also handles lowercase and common mistaken characters (i->1, l->1, o->0, u->v)
+    const CROCKFORD_DECODE_MAP = new Uint8Array(128).fill(0x7f);
+    // 0-9 map to values 0-9
+    for (let i = 0; i <= 9; i++) {
+        CROCKFORD_DECODE_MAP[48 + i] = i; // '0'-'9'
+    }
+    // A-H map to values 10-17 (uppercase and lowercase)
+    for (let i = 0; i < 8; i++) {
+        CROCKFORD_DECODE_MAP[65 + i] = 10 + i; // 'A'-'H'
+        CROCKFORD_DECODE_MAP[97 + i] = 10 + i; // 'a'-'h'
+    }
+    // J-K map to values 18-19 (skipping I)
+    CROCKFORD_DECODE_MAP[74] = 18; // 'J'
+    CROCKFORD_DECODE_MAP[106] = 18; // 'j'
+    CROCKFORD_DECODE_MAP[75] = 19; // 'K'
+    CROCKFORD_DECODE_MAP[107] = 19; // 'k'
+    // M-N map to values 20-21 (skipping L)
+    CROCKFORD_DECODE_MAP[77] = 20; // 'M'
+    CROCKFORD_DECODE_MAP[109] = 20; // 'm'
+    CROCKFORD_DECODE_MAP[78] = 21; // 'N'
+    CROCKFORD_DECODE_MAP[110] = 21; // 'n'
+    // P-T map to values 22-26 (skipping O)
+    for (let i = 0; i < 5; i++) {
+        CROCKFORD_DECODE_MAP[80 + i] = 22 + i; // 'P'-'T'
+        CROCKFORD_DECODE_MAP[112 + i] = 22 + i; // 'p'-'t'
+    }
+    // V-Z map to values 27-31 (skipping U)
+    for (let i = 0; i < 5; i++) {
+        CROCKFORD_DECODE_MAP[86 + i] = 27 + i; // 'V'-'Z'
+        CROCKFORD_DECODE_MAP[118 + i] = 27 + i; // 'v'-'z'
+    }
+    // Handle common mistakes per Crockford spec
+    CROCKFORD_DECODE_MAP[73] = 1; // 'I' -> 1
+    CROCKFORD_DECODE_MAP[105] = 1; // 'i' -> 1
+    CROCKFORD_DECODE_MAP[76] = 1; // 'L' -> 1
+    CROCKFORD_DECODE_MAP[108] = 1; // 'l' -> 1
+    CROCKFORD_DECODE_MAP[79] = 0; // 'O' -> 0
+    CROCKFORD_DECODE_MAP[111] = 0; // 'o' -> 0
+    const len = digitChars.length;
+    const digitValues = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+        const code = digitChars.charCodeAt(i);
+        digitValues[i] = code < 128 ? CROCKFORD_DECODE_MAP[code] : 0x7f;
+        assert(digitValues[i] < 32, "invalid Crockford Base32 character");
     }
     return digitValues;
 };
